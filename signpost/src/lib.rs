@@ -166,9 +166,12 @@ impl SignpostId {
 
 /// Signpost type for different kinds of signpost emissions
 #[repr(u8)]
-enum SignpostType {
+pub(crate) enum SignpostType {
+    /// A signpost event marking a single point in time
     Event = sys::SIGNPOST_TYPE_EVENT,
+    /// The beginning of a signpost interval
     IntervalBegin = sys::SIGNPOST_TYPE_INTERVAL_BEGIN,
+    /// The end of a signpost interval
     IntervalEnd = sys::SIGNPOST_TYPE_INTERVAL_END,
 }
 
@@ -254,7 +257,13 @@ impl OsLog {
     }
 
     /// Centralized signpost emission function
-    fn emit(&self, id: SignpostId, name: &str, message: Option<&str>, signpost_type: SignpostType) {
+    pub(crate) fn emit(
+        &self,
+        id: SignpostId,
+        name: &str,
+        message: Option<&str>,
+        signpost_type: SignpostType,
+    ) {
         if !self.enabled() {
             return;
         }
@@ -498,6 +507,16 @@ macro_rules! event_with_message {
         logger.event_with_message(id, &full_name, $message);
     }};
 }
+
+/// Tracing subscriber integration for os_signpost.
+///
+/// This module provides a [`TracingSubscriber`] that can be used with `tracing-subscriber`
+/// to emit tracing spans and events as os_signpost intervals and events.
+#[cfg(feature = "tracing")]
+pub mod tracing_subscriber;
+
+#[cfg(feature = "tracing")]
+pub use tracing_subscriber::TracingSubscriber;
 
 #[cfg(test)]
 mod tests {
