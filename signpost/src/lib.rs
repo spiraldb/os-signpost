@@ -172,7 +172,7 @@ impl SignpostId {
 ///
 /// The scope is specified in the log handle's configuration and defaults to process-wide
 /// scope if unspecified.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SignpostScope {
     /// Thread-wide matching: The search scope for matching begins and ends is
     /// restricted to single threads.
@@ -188,6 +188,7 @@ pub enum SignpostScope {
     /// This is the default behavior and works well for most use cases. It allows intervals
     /// to span threads within the same process while maintaining clear boundaries between
     /// different processes.
+    #[default]
     Process,
 
     /// System-wide matching: The search scope for matching begins and ends is not
@@ -197,12 +198,6 @@ pub enum SignpostScope {
     /// operations or IPC workflows. Note that pointer-based signpost IDs cannot be used
     /// with system-wide scope since pointers are not valid across process boundaries.
     System,
-}
-
-impl Default for SignpostScope {
-    fn default() -> Self {
-        SignpostScope::Process
-    }
 }
 
 /// Signpost type for different kinds of signpost emissions

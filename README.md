@@ -1,6 +1,6 @@
 # os-signpost
 
-A Rust wrapper for Apple's os_signpost API that provides performance instrumentation and profiling capabilities on macOS and iOS. This crate enables developers to add lightweight performance markers to their applications that integrate seamlessly with Apple's Instruments profiling tool.
+A Rust wrapper for Apple's os_signpost API that integrates with Instruments for performance tracing.
 
 ## Installation
 
