@@ -1,0 +1,18 @@
+[package]
+name = "signpost_derive"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Procedural macros for the signpost crate - Apple's os_signpost performance instrumentation"
+repository = "https://github.com/mhallin/signpost-rs"
+documentation = "https://docs.rs/signpost_derive"
+keywords = ["apple", "macos", "ios", "profiling", "macros"]
+categories = ["development-tools::profiling", "os::macos-apis"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"

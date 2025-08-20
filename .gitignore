@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE/Editor
+.vscode/
+.idea/
+*.iml
+.zed/
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+
+# Temporary files
+*~
+*.tmp
+*.swp
+*.swo
+
+# OS generated files
+Thumbs.db

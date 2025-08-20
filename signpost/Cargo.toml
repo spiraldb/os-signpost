@@ -1,0 +1,20 @@
+[package]
+name = "signpost"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Rust wrapper for Apple's os_signpost API"
+repository = "https://github.com/spirsldb/signpost-macos"
+documentation = "https://docs.rs/signpost"
+keywords = ["apple", "macos", "ios", "profiling", "instrumentation"]
+categories = ["development-tools::profiling", "os::macos-apis"]
+
+[dependencies]
+signpost_derive = { path = "../signpost_derive" }
+
+[build-dependencies]
+bindgen = "0.72"
+
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
