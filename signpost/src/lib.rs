@@ -164,42 +164,6 @@ impl SignpostId {
     }
 }
 
-/// The matching scope for signpost intervals logged with a given os_log_t.
-///
-/// The matching scope determines how signpost intervals are matched between their
-/// begin and end events. This affects both performance and the types of measurements
-/// that are possible.
-///
-/// The scope is specified in the log handle's configuration and defaults to process-wide
-/// scope if unspecified.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SignpostScope {
-    /// Thread-wide matching: The search scope for matching begins and ends is
-    /// restricted to single threads.
-    ///
-    /// Use this when your intervals are guaranteed to begin and end on the same thread,
-    /// such as when tracking function calls or single-threaded operations. This provides
-    /// the most precise matching but cannot track operations that span threads.
-    Thread,
-
-    /// Process-wide matching (Default): The search scope for matching begins and
-    /// ends is restricted to a single process (no cross-process intervals).
-    ///
-    /// This is the default behavior and works well for most use cases. It allows intervals
-    /// to span threads within the same process while maintaining clear boundaries between
-    /// different processes.
-    #[default]
-    Process,
-
-    /// System-wide matching: The search scope for matching begins and ends is not
-    /// restricted, allowing cross-process intervals.
-    ///
-    /// Use this for tracking operations that span multiple processes, such as distributed
-    /// operations or IPC workflows. Note that pointer-based signpost IDs cannot be used
-    /// with system-wide scope since pointers are not valid across process boundaries.
-    System,
-}
-
 /// Signpost type for different kinds of signpost emissions
 #[repr(u8)]
 enum SignpostType {
@@ -233,7 +197,6 @@ enum SignpostType {
 pub struct OsLog {
     subsystem: String,
     category: &'static CStr,
-    scope: SignpostScope,
     handle: AtomicPtr<sys::os_log_s>,
     init: std::sync::Once,
 }
@@ -244,16 +207,9 @@ impl OsLog {
         Self {
             subsystem,
             category,
-            scope: SignpostScope::default(),
             handle: AtomicPtr::new(std::ptr::null_mut()),
             init: std::sync::Once::new(),
         }
-    }
-
-    /// Set the signpost matching scope
-    pub fn with_scope(mut self, scope: SignpostScope) -> Self {
-        self.scope = scope;
-        self
     }
 
     /// Check if signpost logging is enabled for this logger
@@ -576,18 +532,6 @@ mod tests {
         assert_eq!(sys::SIGNPOST_TYPE_EVENT, 0);
         assert_eq!(sys::SIGNPOST_TYPE_INTERVAL_BEGIN, 1);
         assert_eq!(sys::SIGNPOST_TYPE_INTERVAL_END, 2);
-    }
-
-    #[test]
-    fn test_signpost_scope() {
-        // Test SignpostScope enum - default is actually Process, not Thread
-        assert_eq!(SignpostScope::default(), SignpostScope::Process);
-
-        let logger = OsLog::new("test.scope".to_string(), categories::POINTS_OF_INTEREST)
-            .with_scope(SignpostScope::Thread);
-
-        // Should not panic
-        let _id = SignpostId::generate(&logger);
     }
 
     #[test]
