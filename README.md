@@ -6,7 +6,7 @@ A Rust wrapper for Apple's os_signpost API that integrates with Instruments for 
 
 ```toml
 [dependencies]
-signpost = "0.1.0"
+os_signpost = "0.2.0"
 ```
 
 ## Quick Start

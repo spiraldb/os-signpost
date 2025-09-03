@@ -4,7 +4,7 @@
 //! To run: cargo run --example tracing_integration --features tracing
 //! To view in Instruments: Create a new trace with "os_signpost" template.
 
-use signpost::{categories, Signpost};
+use os_signpost::{categories, Signpost};
 use std::thread;
 use std::time::Duration;
 use tracing::{info, instrument};
@@ -15,7 +15,7 @@ fn main() {
     Signpost::configure("dev.vortex", categories::POINTS_OF_INTEREST);
 
     Registry::default()
-        .with(signpost::TracingSubscriber::new())
+        .with(os_signpost::TracingSubscriber::new())
         .with(tracing_subscriber::fmt::Layer::default().compact())
         .init();
 

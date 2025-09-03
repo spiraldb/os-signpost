@@ -48,8 +48,8 @@ pub fn signpost(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Generate common signpost setup
     let signpost_setup = quote! {
-        let __logger = signpost::global_logger();
-        let __id = signpost::SignpostId::generate(__logger);
+        let __logger = os_signpost::global_logger();
+        let __id = os_signpost::SignpostId::generate(__logger);
     };
 
     // Generate interval creation based on whether message is provided

@@ -1,6 +1,6 @@
 //! Basic example usage of the signpost API.
 
-use signpost::{categories, Signpost};
+use os_signpost::{categories, Signpost};
 
 fn main() {
     // Configure signpost at startup once.
@@ -13,15 +13,15 @@ fn main() {
 }
 
 mod data {
-    use signpost::signpost;
+    use os_signpost::signpost;
     use std::thread::sleep;
     use std::time::Duration;
 
     #[signpost]
     pub(super) fn load() -> Vec<i32> {
-        signpost::event_with_message!("before", "started");
+        os_signpost::event_with_message!("before", "started");
         sleep(Duration::from_millis(100));
-        signpost::event_with_message!("after", "ended");
+        os_signpost::event_with_message!("after", "ended");
         vec![1, 2, 3, 4]
     }
 
@@ -30,8 +30,8 @@ mod data {
         let mut results = Vec::new();
 
         for item in items.iter() {
-            let _guard = signpost::interval_with_message!("item", format!("{item}"));
-            signpost::event!("another");
+            let _guard = os_signpost::interval_with_message!("item", format!("{item}"));
+            os_signpost::event!("another");
             sleep(Duration::from_millis(50));
             results.push(*item);
         }
@@ -41,8 +41,8 @@ mod data {
 
     #[signpost]
     pub(super) fn save(_data: &[i32]) {
-        signpost::event_with_message!("before", "started");
+        os_signpost::event_with_message!("before", "started");
         sleep(Duration::from_millis(30));
-        signpost::event_with_message!("after", "ended");
+        os_signpost::event_with_message!("after", "ended");
     }
 }
