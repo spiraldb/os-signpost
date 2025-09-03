@@ -1,7 +1,13 @@
-use std::env;
-use std::path::PathBuf;
-
 fn main() {
+    #[cfg(target_vendor = "apple")]
+    generate_apple_bindings();
+}
+
+#[cfg(target_vendor = "apple")]
+fn generate_apple_bindings() {
+    use std::env;
+    use std::path::PathBuf;
+
     let bindings = bindgen::Builder::default()
         .header_contents(
             "temporary.h",

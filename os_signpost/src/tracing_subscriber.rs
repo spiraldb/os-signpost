@@ -3,8 +3,7 @@
 //! Provides a [`TracingSubscriber`] that can be used with the `tracing-subscriber`
 //! crate to emit os_signpost intervals and events to be viewed in Apple's Instruments.
 
-use crate::global_logger;
-use crate::{SignpostId, SignpostType};
+use crate::{global_logger, platform, SignpostId};
 use dashmap::DashMap;
 use tracing::{span, Event, Id, Subscriber};
 use tracing_subscriber::layer::Context;
@@ -58,11 +57,12 @@ where
         // Generate unique signpost ID for this span
         let signpost_id = SignpostId::generate(logger);
 
-        logger.emit(
-            signpost_id,
+        platform::emit_signpost(
+            &logger.handle,
+            signpost_id.raw(),
             &name,
             visitor.message.as_deref(),
-            SignpostType::IntervalBegin,
+            platform::SIGNPOST_TYPE_INTERVAL_BEGIN,
         );
 
         // Store the interval. To be removed when the interval ends.
@@ -98,11 +98,12 @@ where
                 .unwrap_or_default(),
         );
 
-        logger.emit(
-            SignpostId::generate(logger),
+        platform::emit_signpost(
+            &logger.handle,
+            SignpostId::generate(logger).raw(),
             &name,
             visitor.message.as_deref(),
-            SignpostType::Event,
+            platform::SIGNPOST_TYPE_EVENT,
         );
     }
 
@@ -114,7 +115,13 @@ where
 
         // End the interval and remove it from the map.
         if let Some((_, interval)) = self.intervals.remove(&id) {
-            logger.emit(interval.id, &interval.name, None, SignpostType::IntervalEnd);
+            platform::emit_signpost(
+                &logger.handle,
+                interval.id.raw(),
+                &interval.name,
+                None,
+                platform::SIGNPOST_TYPE_INTERVAL_END,
+            );
         }
     }
 }

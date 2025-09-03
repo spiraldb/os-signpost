@@ -22,53 +22,26 @@
 
 pub use os_signpost_derive::signpost;
 
-use std::{
-    ffi::{c_void, CStr},
-    sync::{
-        atomic::{AtomicPtr, Ordering},
-        OnceLock,
-    },
-};
+use std::{ffi::CStr, sync::OnceLock};
 
-mod sys {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(dead_code)]
-
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-
-    // Provide compatibility constants with standard names
-    pub use self::{
-        os_signpost_type_t_OS_SIGNPOST_EVENT as SIGNPOST_TYPE_EVENT,
-        os_signpost_type_t_OS_SIGNPOST_INTERVAL_BEGIN as SIGNPOST_TYPE_INTERVAL_BEGIN,
-        os_signpost_type_t_OS_SIGNPOST_INTERVAL_END as SIGNPOST_TYPE_INTERVAL_END,
-    };
-}
+// Platform-specific implementations
+mod platform;
 
 /// Predefined log categories for different types of signpost instrumentation.
 pub mod categories {
-    use crate::sys;
-    use std::ffi::CStr;
-
     /// Provide this value as the category to os_log_create to indicate that
     /// signposts on the resulting log handle provide high-level events that can be
     /// used to orient a developer looking at performance data. These will be
     /// displayed by default by performance tools like Instruments.app.
-    pub const POINTS_OF_INTEREST: &CStr =
-        unsafe { &*(sys::OS_LOG_CATEGORY_POINTS_OF_INTEREST as *const [u8] as *const CStr) };
-
+    ///
     /// Use this category for signposts that should be disabled by default to reduce runtime
     /// overhead. These signposts will only be active when a performance tool like Instruments
     /// is actively recording, providing detailed insights without impacting normal operation.
-    pub const DYNAMIC_TRACING: &CStr =
-        unsafe { &*(sys::OS_LOG_CATEGORY_DYNAMIC_TRACING as *const [u8] as *const CStr) };
-
+    ///
     /// Use this category for signposts that should capture user backtraces. This behavior is
     /// more expensive than regular signposts, so it will only be active when a performance
     /// tool like Instruments is actively recording.
-    pub const DYNAMIC_STACK_TRACING: &CStr =
-        unsafe { &*(sys::OS_LOG_CATEGORY_DYNAMIC_STACK_TRACING as *const [u8] as *const CStr) };
+    pub use crate::platform::{DYNAMIC_STACK_TRACING, DYNAMIC_TRACING, POINTS_OF_INTEREST};
 }
 
 /// Errors that can occur when working with signposts.
@@ -114,7 +87,7 @@ impl SignpostId {
     /// # Returns
     /// A valid `SignpostId`.
     pub fn generate(log: &OsLog) -> Self {
-        Self(unsafe { sys::os_signpost_id_generate(log.get()) })
+        Self(platform::os_signpost_id_generate(&log.handle))
     }
 
     /// Creates a signpost ID from a pointer value.
@@ -136,7 +109,8 @@ impl SignpostId {
     /// # Note
     /// This approach is not applicable to signposts that span process boundaries.
     pub fn from_pointer<T>(log: &OsLog, ptr: *const T) -> Result<Self, SignpostError> {
-        let id = unsafe { sys::os_signpost_id_make_with_pointer(log.get(), ptr as *const c_void) };
+        let id =
+            platform::os_signpost_id_make_with_pointer(&log.handle, ptr as *const std::ffi::c_void);
         Ok(Self(id))
     }
 
@@ -164,17 +138,6 @@ impl SignpostId {
     }
 }
 
-/// Signpost type for different kinds of signpost emissions
-#[repr(u8)]
-pub(crate) enum SignpostType {
-    /// A signpost event marking a single point in time
-    Event = sys::SIGNPOST_TYPE_EVENT,
-    /// The beginning of a signpost interval
-    IntervalBegin = sys::SIGNPOST_TYPE_INTERVAL_BEGIN,
-    /// The end of a signpost interval
-    IntervalEnd = sys::SIGNPOST_TYPE_INTERVAL_END,
-}
-
 /// A logger for a specific subsystem and category.
 ///
 /// `OsLog` represents a configured logging destination for signposts. Each logger
@@ -197,33 +160,40 @@ pub(crate) enum SignpostType {
 ///     .with_scope(SignpostScope::Thread);
 /// ```
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct OsLog {
     subsystem: String,
     category: &'static CStr,
-    handle: AtomicPtr<sys::os_log_s>,
-    init: std::sync::Once,
+    handle: platform::LogHandle,
 }
 
 impl OsLog {
     /// Create a new logger for the given subsystem and category
     pub fn new(subsystem: String, category: &'static CStr) -> Self {
+        let subsystem_cstr = std::ffi::CString::new(subsystem.as_str()).unwrap();
+        let handle = platform::os_log_create(&subsystem_cstr, category);
+
         Self {
             subsystem,
             category,
-            handle: AtomicPtr::new(std::ptr::null_mut()),
-            init: std::sync::Once::new(),
+            handle,
         }
     }
 
     /// Check if signpost logging is enabled for this logger
     pub fn enabled(&self) -> bool {
-        let handle = self.get();
-        unsafe { sys::os_signpost_enabled(handle) }
+        platform::os_signpost_enabled(&self.handle)
     }
 
     /// Emit a simple event (point in time)
     pub fn event<T: AsRef<str>>(&self, id: SignpostId, name: T) {
-        self.emit(id, name.as_ref(), None, SignpostType::Event);
+        platform::emit_signpost(
+            &self.handle,
+            id.0,
+            name.as_ref(),
+            None,
+            platform::SIGNPOST_TYPE_EVENT,
+        );
     }
 
     /// Emit an event with a formatted message
@@ -233,11 +203,12 @@ impl OsLog {
         name: T1,
         message: T2,
     ) {
-        self.emit(
-            id,
+        platform::emit_signpost(
+            &self.handle,
+            id.0,
             name.as_ref(),
             Some(message.as_ref()),
-            SignpostType::Event,
+            platform::SIGNPOST_TYPE_EVENT,
         );
     }
 
@@ -262,60 +233,9 @@ impl OsLog {
         id: SignpostId,
         name: &str,
         message: Option<&str>,
-        signpost_type: SignpostType,
+        signpost_type: platform::SignpostType,
     ) {
-        if !self.enabled() {
-            return;
-        }
-
-        let name_cstr = std::ffi::CString::new(name).unwrap_or_default();
-        let message_cstr = message.map(|msg| std::ffi::CString::new(msg).unwrap_or_default());
-
-        let os_signpost_type = match signpost_type {
-            SignpostType::Event => sys::SIGNPOST_TYPE_EVENT,
-            SignpostType::IntervalBegin => sys::SIGNPOST_TYPE_INTERVAL_BEGIN,
-            SignpostType::IntervalEnd => sys::SIGNPOST_TYPE_INTERVAL_END,
-        };
-
-        // Dart SDK for reference on how to set up the format buffer:
-        // https://github.com/dart-lang/sdk/blob/3e2d3bc77fa8bb5139b869e9b3a5357b5487df18/runtime/vm/timeline_macos.cc#L34C1-L34C34
-        const FORMAT_BUFFER_LEN: usize = 64;
-
-        #[repr(align(16))]
-        struct AlignedBuffer {
-            data: [u8; FORMAT_BUFFER_LEN],
-        }
-
-        static FORMAT_BUFFER: AlignedBuffer = AlignedBuffer {
-            data: [0; FORMAT_BUFFER_LEN],
-        };
-
-        unsafe {
-            sys::_os_signpost_emit_with_name_impl(
-                (&raw mut sys::__dso_handle) as *mut usize as *mut c_void,
-                self.get(),
-                os_signpost_type,
-                id.0,
-                name_cstr.as_ptr(),
-                message_cstr
-                    .as_ref()
-                    .map(|msg| msg.as_ptr())
-                    .unwrap_or(std::ptr::null()),
-                &FORMAT_BUFFER.data as *const _ as *mut u8,
-                FORMAT_BUFFER_LEN as u32,
-            );
-        }
-    }
-
-    fn get(&self) -> sys::os_log_t {
-        self.init.call_once(|| {
-            let subsystem_cstr = std::ffi::CString::new(self.subsystem.as_str()).unwrap();
-            let handle =
-                unsafe { sys::os_log_create(subsystem_cstr.as_ptr(), self.category.as_ptr()) };
-            self.handle.store(handle, Ordering::SeqCst);
-        });
-
-        self.handle.load(Ordering::SeqCst)
+        platform::emit_signpost(&self.handle, id.0, name, message, signpost_type);
     }
 }
 
@@ -352,14 +272,17 @@ impl<'a> SignpostInterval<'a> {
             self.id,
             &self.name,
             self.message.as_ref().map(|m| m.as_ref()),
-            SignpostType::IntervalBegin,
+            platform::SIGNPOST_TYPE_INTERVAL_BEGIN,
         );
     }
 
     fn end_internal(&self) {
-        self.log
-            // Don't repeat the start message as an end message.
-            .emit(self.id, &self.name, None, SignpostType::IntervalEnd);
+        self.log.emit(
+            self.id,
+            &self.name,
+            None,
+            platform::SIGNPOST_TYPE_INTERVAL_END,
+        );
     }
 }
 
@@ -422,13 +345,6 @@ macro_rules! function_name {
     }};
 }
 
-/// Creates a signpost interval manually with a name.
-///
-/// # Parameters
-/// - `name`: A static string describing the operation being measured.
-///
-/// # Returns
-/// A `SignpostInterval` that will automatically emit an end signpost when dropped.
 /// Creates a signpost interval manually with a name that includes the module path.
 ///
 /// # Parameters
@@ -533,8 +449,11 @@ mod tests {
         .expect_err("Should panic when configuring twice");
     }
 
+    #[cfg(target_vendor = "apple")]
     #[test]
     fn test_bindgen_integration() {
+        use crate::platform::apple::sys;
+
         // Test that os_log_t is a pointer type from generated bindings
         let null_log: sys::os_log_t = std::ptr::null_mut();
         assert!(null_log.is_null());

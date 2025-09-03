@@ -13,17 +13,22 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-rust
 
-
       - name: Rust Build
         run: cargo build --all-features --all-targets
+
       - name: Rust Lint - Format
         run: cargo fmt --all --check
+
       - name: Rust Lint - Clippy
         run: cargo clippy --all-features --all-targets
+
       - name: Rust Test
         run: cargo test --workspace --all-features
