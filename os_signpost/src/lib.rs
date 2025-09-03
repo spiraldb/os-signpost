@@ -20,7 +20,7 @@
 //! - Process-wide: Matching is restricted to a single process (default)
 //! - System-wide: Matching can span across processes
 
-pub use signpost_derive::signpost;
+pub use os_signpost_derive::signpost;
 
 use std::{
     ffi::{c_void, CStr},

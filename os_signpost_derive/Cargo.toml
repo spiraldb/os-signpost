@@ -1,5 +1,5 @@
 [package]
-name = "signpost_derive"
+name = "os_signpost_derive"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
