@@ -12,7 +12,7 @@ os_signpost = "0.2.0"
 ## Quick Start
 
 ```rust
-use signpost::{categories, signpost, Signpost};
+use os_signpost::{categories, signpost, Signpost};
 
 fn main() {
     // Initialize the global signpost provider once.
@@ -24,16 +24,16 @@ fn main() {
 
 #[signpost]
 fn load_data() -> Vec<i32> {
-    signpost::event_with_message!("loading data", "in progress");
+    os_signpost::event_with_message!("loading data", "in progress");
     vec![1, 2, 3, 4, 5]
 }
 
 fn process_data(data: &[i32]) -> Vec<i32> {
-    let _interval = signpost::interval!("processing");
+    let _interval = os_signpost::interval!("processing");
 
     data.iter()
         .map(|x| {
-            signpost::event!("item_processed");
+            os_signpost::event!("item_processed");
             x * 2
         })
         .collect()
@@ -50,25 +50,25 @@ fn save_result(_data: &[i32]) {
 **Intervals** represent periods of time with a beginning and end:
 
 ```rust
-let interval = signpost::interval!("data_processing");
+let interval = os_signpost::interval!("data_processing");
 // .. process data
 drop(interval); // Interval ends on drop.
 
-let _guard = signpost::interval_with_message!("network_request", "GET /api/users");
+let _guard = os_signpost::interval_with_message!("network_request", "GET /api/users");
 // .. make request
 ```
 
 **Events** mark single points in time:
 
 ```rust
-signpost::event!("cache_miss");
-signpost::event_with_message!("user_action", "button_clicked");
+os_signpost::event!("cache_miss");
+os_signpost::event_with_message!("user_action", "button_clicked");
 ```
 
 ## Using OsLog Without Signpost
 
 ```rust
-use signpost::{OsLog, SignpostId, categories};
+use os_signpost::{OsLog, SignpostId, categories};
 
 let logger = OsLog::new("com.example.app".to_string(), categories::POINTS_OF_INTEREST);
 
